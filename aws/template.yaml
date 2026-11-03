@@ -1,0 +1,309 @@
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: FindBack Telangana minimal serverless API
+
+Parameters:
+  FirebaseServiceAccountSecretArn:
+    Type: String
+    Description: ARN of a Secrets Manager secret containing the Firebase Admin service-account JSON.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 20
+    MemorySize: 256
+    Environment:
+      Variables:
+        USERS_TABLE: !Ref UsersTable
+        REPORTS_TABLE: !Ref ReportsTable
+        NOTIFICATIONS_TABLE: !Ref NotificationsTable
+        MATCHES_TABLE: !Ref MatchesTable
+        PHOTOS_BUCKET: !Ref PhotosBucket
+        FIREBASE_SERVICE_ACCOUNT_SECRET_ARN: !Ref FirebaseServiceAccountSecretArn
+
+Resources:
+
+  FindBackApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowHeaders:
+          - authorization
+          - content-type
+        AllowMethods:
+          - GET
+          - POST
+          - PATCH
+          - DELETE
+          - OPTIONS
+        MaxAge: 600
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/
+      Handler: handlers.api_handler.lambda_handler
+
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReportsTable
+
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotificationsTable
+
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MatchesTable
+
+        - S3CrudPolicy:
+            BucketName: !Ref PhotosBucket
+
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref FirebaseServiceAccountSecretArn
+
+      Events:
+
+        GetMe:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /me
+            Method: GET
+
+        PatchMe:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /me
+            Method: PATCH
+
+        CreateReport:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /reports
+            Method: POST
+
+        MyReports:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /reports/my
+            Method: GET
+
+        ReadReport:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /reports/{id}
+            Method: GET
+
+        UpdateReport:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /reports/{id}
+            Method: PATCH
+
+        PresignPhoto:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /uploads/presign
+            Method: POST
+
+        Search:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /search
+            Method: POST
+
+        PublicPhoto:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /public/reports/{id}/photos/{index}
+            Method: GET
+
+        AdminReports:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /admin/reports
+            Method: GET
+
+        AdminReportStatus:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /admin/reports/{id}/status
+            Method: PATCH
+
+        AdminEditReport:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /admin/reports/{id}
+            Method: PATCH
+
+        AdminDeleteReport:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /admin/reports/{id}
+            Method: DELETE
+
+        Notifications:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /notifications
+            Method: GET
+
+        MarkNotificationRead:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FindBackApi
+            Path: /notifications/{id}/read
+            Method: PATCH
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+
+  ReportsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: reportId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: typeDistrict
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: reportId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserCreatedIndex
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+        - IndexName: TypeDistrictCreatedIndex
+          KeySchema:
+            - AttributeName: typeDistrict
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+        - IndexName: StatusCreatedIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  NotificationsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: notificationId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: notificationId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserCreatedIndex
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  MatchesTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: matchId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: matchId
+          KeyType: HASH
+
+  PhotosBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: RemoveIncompleteUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 2
+
+Outputs:
+  ApiBaseUrl:
+    Description: Use this HTTPS URL, including its trailing slash, as findbackApiBaseUrl.
+    Value: !Sub "https://${FindBackApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/prod/"
+
+  PhotosBucketName:
+    Description: S3 bucket for uploaded photos.
+    Value: !Ref PhotosBucket

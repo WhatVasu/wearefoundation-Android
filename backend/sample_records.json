@@ -1,0 +1,26 @@
+[
+  {
+    "reportId": "SAMPLE-MISSING-001",
+    "reportType": "MISSING",
+    "name": "Fictional Person A",
+    "age": 34,
+    "gender": "Unknown",
+    "district": "Hyderabad",
+    "location": "Sample locality",
+    "description": "Synthetic example only; do not treat as a real case.",
+    "status": "VERIFIED",
+    "createdAt": "2026-01-15T10:00:00+00:00"
+  },
+  {
+    "reportId": "SAMPLE-FOUND-001",
+    "reportType": "FOUND",
+    "name": "",
+    "age": 30,
+    "gender": "Unknown",
+    "district": "Hyderabad",
+    "location": "Sample area",
+    "description": "Synthetic example only; do not treat as a real case.",
+    "status": "POTENTIAL_MATCH",
+    "createdAt": "2026-01-16T10:00:00+00:00"
+  }
+]

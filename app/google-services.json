@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "721588821219",
+    "project_id": "praja-rakshak",
+    "storage_bucket": "praja-rakshak.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:721588821219:android:88fb11d9d316d62ec8f9d6",
+        "android_client_info": {
+          "package_name": "com.example.prajarakshak"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyASIzl-BE6E1G2k8h8gBTddbLS8sSreZbI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
