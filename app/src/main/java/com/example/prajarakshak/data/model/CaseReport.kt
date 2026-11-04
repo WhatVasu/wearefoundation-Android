@@ -12,9 +12,9 @@ data class CaseReport(
     val imageUrls: List<String>? = emptyList(),
     val status: String = "Submitted",
     val createdAt: String? = null,
-    val matchingSignals: List<String> = emptyList(),
-    val statusHistory: List<StatusEvent> = emptyList(),
-    val physicalFeatures: Map<String, String> = emptyMap(),
+    val matchingSignals: List<String>? = emptyList(),
+    val statusHistory: List<StatusEvent>? = emptyList(),
+    val physicalFeatures: Map<String, String>? = emptyMap(),
     val lastSeenDate: String? = null,
     val potentialMatchReportId: String? = null
 )

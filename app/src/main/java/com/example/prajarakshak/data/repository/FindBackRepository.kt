@@ -19,6 +19,7 @@ import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.PhoneAuthCredential
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -61,6 +62,27 @@ class FindBackRepository(
         Tasks.await(configuredAuth.signInWithCredential(credential))
         Tasks.await(requireNotNull(configuredAuth.currentUser).getIdToken(true))
         ApiClient.api().getProfile()
+    }
+
+    suspend fun authenticateWithPhone(
+        credential: PhoneAuthCredential,
+        linkToCurrentUser: Boolean
+    ) = withContext(Dispatchers.IO) {
+        val configuredAuth = requireNotNull(auth) { firebaseSetupMessage }
+        val currentUser = configuredAuth.currentUser
+        if (linkToCurrentUser) {
+            val user = requireNotNull(currentUser) { "Sign in before linking a phone number." }
+            Tasks.await(user.linkWithCredential(credential))
+        } else {
+            Tasks.await(configuredAuth.signInWithCredential(credential))
+        }
+        val user = requireNotNull(configuredAuth.currentUser)
+        Tasks.await(user.reload())
+        Tasks.await(user.getIdToken(true))
+        val profile = ApiClient.api().getProfile()
+        user.phoneNumber?.takeIf(String::isNotBlank)?.let { phoneNumber ->
+            ApiClient.api().updateProfile(mapOf("phone" to phoneNumber))
+        } ?: profile
     }
 
     suspend fun register(
@@ -134,6 +156,10 @@ class FindBackRepository(
 
     suspend fun search(request: SearchRequest): SearchResponse = withContext(Dispatchers.IO) {
         ApiClient.api().search(request)
+    }
+
+    suspend fun reportDetails(reportId: String): CaseReport = withContext(Dispatchers.IO) {
+        ApiClient.api().getReportDetails(reportId)
     }
 
     suspend fun adminReports(status: String) = withContext(Dispatchers.IO) {

@@ -1,8 +1,10 @@
 package com.example.prajarakshak.viewmodel
 
 import android.app.Application
+import android.app.Activity
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.FirebaseException
 import com.example.prajarakshak.data.api.ApiClient
 import com.example.prajarakshak.data.model.CaseReport
 import com.example.prajarakshak.data.model.AppNotification
@@ -12,6 +14,9 @@ import com.example.prajarakshak.data.model.UserProfile
 import com.example.prajarakshak.data.repository.FindBackRepository
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.PhoneAuthCredential
+import com.google.firebase.auth.PhoneAuthOptions
+import com.google.firebase.auth.PhoneAuthProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +27,7 @@ import java.io.IOException
 import org.json.JSONException
 import org.json.JSONObject
 import retrofit2.HttpException
+import java.util.concurrent.TimeUnit
 
 enum class NoticeType { SUCCESS, ERROR, WARNING, INFORMATION }
 
@@ -61,6 +67,12 @@ data class FindBackUiState(
     val lastSubmittedReportType: String? = null,
     val lastUpdatedReportId: String? = null,
     val profileUpdateVersion: Int = 0,
+    val phoneAuthLoading: Boolean = false,
+    val phoneOtpSent: Boolean = false,
+    val phoneVerificationId: String? = null,
+    val phoneAuthError: String? = null,
+    val phoneResendAvailableAt: Long? = null,
+    val phoneAuthSuccessVersion: Int = 0,
     val profile: UserProfile? = null,
     val user: FirebaseUser? = null,
 )
@@ -103,6 +115,10 @@ class FindBackViewModel(application: Application) : AndroidViewModel(application
     private var detailsRequestId = 0
     private var activeActions = 0
     private var noticeSequence = 0L
+    private var phoneAuthRequestId = 0
+    private var phoneAuthCompletionStarted = false
+    private var phoneAuthLinking = false
+    private var phoneResendingToken: PhoneAuthProvider.ForceResendingToken? = null
 
     init {
         if (auth?.currentUser != null) {
@@ -139,6 +155,178 @@ class FindBackViewModel(application: Application) : AndroidViewModel(application
             user = auth?.currentUser
         )
         "Login successful! Welcome back."
+    }
+
+    fun startPhoneVerification(activity: Activity, phoneNumber: String, resend: Boolean = false) {
+        val configuredAuth = auth
+        if (configuredAuth == null) {
+            _state.value = _state.value.copy(
+                phoneAuthError = FindBackRepository.firebaseSetupMessage,
+                phoneAuthLoading = false
+            )
+            return
+        }
+
+        val requestId = ++phoneAuthRequestId
+        phoneAuthCompletionStarted = false
+        phoneAuthLinking = configuredAuth.currentUser != null
+        _state.value = _state.value.copy(
+            phoneAuthLoading = true,
+            phoneAuthError = null,
+            phoneOtpSent = resend && _state.value.phoneOtpSent,
+            phoneVerificationId = if (resend) _state.value.phoneVerificationId else null,
+            phoneResendAvailableAt = if (resend) _state.value.phoneResendAvailableAt else null
+        )
+        val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+            override fun onVerificationCompleted(credential: PhoneAuthCredential) {
+                completePhoneAuthentication(credential, requestId)
+            }
+
+            override fun onVerificationFailed(exception: FirebaseException) {
+                if (requestId != phoneAuthRequestId) return
+                val message = errorMessage(exception)
+                _state.value = _state.value.copy(
+                    phoneAuthLoading = false,
+                    phoneAuthError = message
+                )
+                notify(message, NoticeType.ERROR)
+            }
+
+            override fun onCodeSent(
+                verificationId: String,
+                token: PhoneAuthProvider.ForceResendingToken
+            ) {
+                if (requestId != phoneAuthRequestId) return
+                phoneResendingToken = token
+                _state.value = _state.value.copy(
+                    phoneAuthLoading = false,
+                    phoneOtpSent = true,
+                    phoneVerificationId = verificationId,
+                    phoneAuthError = null,
+                    phoneResendAvailableAt = System.currentTimeMillis() + 60_000L
+                )
+            }
+
+            override fun onCodeAutoRetrievalTimeOut(verificationId: String) {
+                if (requestId != phoneAuthRequestId) return
+                _state.value = _state.value.copy(
+                    phoneAuthLoading = false,
+                    phoneOtpSent = true,
+                    phoneVerificationId = verificationId
+                )
+            }
+        }
+
+        try {
+            val optionsBuilder = PhoneAuthOptions.newBuilder(configuredAuth)
+                .setPhoneNumber(normalizePhoneNumber(phoneNumber))
+                .setTimeout(60L, TimeUnit.SECONDS)
+                .setActivity(activity)
+                .setCallbacks(callbacks)
+            phoneResendingToken?.let(optionsBuilder::setForceResendingToken)
+            PhoneAuthProvider.verifyPhoneNumber(optionsBuilder.build())
+        } catch (exception: Exception) {
+            val message = errorMessage(exception)
+            _state.value = _state.value.copy(phoneAuthLoading = false, phoneAuthError = message)
+            notify(message, NoticeType.ERROR)
+        }
+    }
+
+    fun verifyPhoneCode(code: String) {
+        val verificationId = _state.value.phoneVerificationId
+        if (verificationId.isNullOrBlank()) {
+            _state.value = _state.value.copy(phoneAuthError = "Request a verification code first.")
+            return
+        }
+        if (!code.trim().matches(Regex("\\d{6}"))) {
+            _state.value = _state.value.copy(phoneAuthError = "Enter the 6-digit verification code.")
+            return
+        }
+        completePhoneAuthentication(
+            PhoneAuthProvider.getCredential(verificationId, code.trim()),
+            phoneAuthRequestId
+        )
+    }
+
+    fun cancelPhoneAuthentication() {
+        phoneAuthRequestId++
+        phoneAuthCompletionStarted = false
+        phoneResendingToken = null
+        _state.value = _state.value.copy(
+            phoneAuthLoading = false,
+            phoneOtpSent = false,
+            phoneVerificationId = null,
+            phoneAuthError = null,
+            phoneResendAvailableAt = null
+        )
+    }
+
+    private fun completePhoneAuthentication(credential: PhoneAuthCredential, requestId: Int) {
+        if (requestId != phoneAuthRequestId || phoneAuthCompletionStarted) return
+        phoneAuthCompletionStarted = true
+        val linking = phoneAuthLinking
+        viewModelScope.launch {
+            activeActions++
+            _state.value = _state.value.copy(
+                loading = true,
+                phoneAuthLoading = true,
+                phoneAuthError = null,
+                message = "Verifying phone number…",
+                error = null
+            )
+            try {
+                val profile = repository.authenticateWithPhone(credential, linking)
+                if (requestId != phoneAuthRequestId) return@launch
+                _state.value = _state.value.copy(profile = profile, user = auth?.currentUser)
+                val reports = repository.reports()
+                if (requestId != phoneAuthRequestId) return@launch
+                _state.value = _state.value.copy(
+                    reports = reports,
+                    user = auth?.currentUser,
+                    loading = true,
+                    phoneAuthLoading = false,
+                    phoneOtpSent = false,
+                    phoneVerificationId = null,
+                    phoneResendAvailableAt = null,
+                    phoneAuthError = null,
+                    phoneAuthSuccessVersion = _state.value.phoneAuthSuccessVersion + 1,
+                    message = "Phone number verified successfully.",
+                    notice = nextNotice(
+                        if (linking) "Phone number linked to your account."
+                        else "Login successful! Welcome back.",
+                        NoticeType.SUCCESS
+                    )
+                )
+                phoneResendingToken = null
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                if (requestId != phoneAuthRequestId) return@launch
+                phoneAuthCompletionStarted = false
+                val message = errorMessage(exception)
+                _state.value = _state.value.copy(
+                    phoneAuthLoading = false,
+                    phoneAuthError = message,
+                    error = message,
+                    notice = nextNotice(message, noticeType(exception)),
+                    user = auth?.currentUser
+                )
+            } finally {
+                activeActions = (activeActions - 1).coerceAtLeast(0)
+                _state.value = _state.value.copy(loading = activeActions > 0)
+            }
+        }
+    }
+
+    private fun normalizePhoneNumber(phoneNumber: String): String {
+        val compact = phoneNumber.filterNot {
+            it.isWhitespace() || it == '-' || it == '(' || it == ')'
+        }
+        return when {
+            compact.startsWith("+") -> compact
+            compact.startsWith("91") && compact.length == 12 -> "+$compact"
+            else -> "+91$compact"
+        }
     }
 
     fun register(name: String, email: String, phone: String, district: String, password: String) =
@@ -327,7 +515,7 @@ class FindBackViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun loadReportDetails(reportId: String) {
+    fun loadReportDetails(reportId: String, ownedReport: Boolean = false) {
         detailsJob?.cancel()
         val requestId = ++detailsRequestId
         detailsJob = viewModelScope.launch {
@@ -337,12 +525,17 @@ class FindBackViewModel(application: Application) : AndroidViewModel(application
                 detailsError = null
             )
             try {
-                val response = repository.search(SearchRequest(mode = "details", reportId = reportId))
+                val report = if (ownedReport) {
+                    repository.reportDetails(reportId)
+                } else {
+                    repository.search(SearchRequest(mode = "details", reportId = reportId))
+                        .results.firstOrNull()
+                }
                 if (requestId != detailsRequestId) return@launch
                 _state.value = _state.value.copy(
-                    selectedReport = response.results.firstOrNull(),
+                    selectedReport = report,
                     detailsLoading = false,
-                    detailsError = if (response.results.isEmpty()) "This report is unavailable." else null
+                    detailsError = if (report == null) "This report is unavailable." else null
                 )
             } catch (exception: CancellationException) {
                 throw exception
@@ -584,6 +777,17 @@ class FindBackViewModel(application: Application) : AndroidViewModel(application
         }
 
     private fun errorMessage(exception: Exception): String {
+        val firebaseError = generateSequence<Throwable>(exception) { it.cause }
+            .filterIsInstance<FirebaseException>()
+            .firstOrNull()
+        if (firebaseError?.message.orEmpty().contains(
+                "SMS unable to be sent until this region enabled",
+                ignoreCase = true
+            )
+        ) {
+            return "Firebase is blocking SMS to this region. Enable India in Firebase Console under Authentication > Settings > SMS region policy, and make sure Phone sign-in is enabled."
+        }
+
         val authError = generateSequence<Throwable>(exception) { it.cause }
             .filterIsInstance<FirebaseAuthException>()
             .firstOrNull()
@@ -594,6 +798,13 @@ class FindBackViewModel(application: Application) : AndroidViewModel(application
                 "ERROR_INVALID_EMAIL" -> "Enter a valid email address."
                 "ERROR_USER_DISABLED" -> "This account is disabled. Contact support."
                 "ERROR_TOO_MANY_REQUESTS" -> "Too many unsuccessful attempts. Wait and try again."
+                "ERROR_INVALID_PHONE_NUMBER" -> "Enter a valid phone number."
+                "ERROR_INVALID_VERIFICATION_CODE" -> "That verification code is incorrect."
+                "ERROR_SESSION_EXPIRED" -> "That verification code expired. Request a new one."
+                "ERROR_CREDENTIAL_ALREADY_IN_USE" ->
+                    "This phone number is linked to another account."
+                "ERROR_PROVIDER_ALREADY_LINKED" -> "A phone number is already linked to this account."
+                "ERROR_QUOTA_EXCEEDED" -> "SMS verification is temporarily unavailable. Try again later."
                 "ERROR_EMAIL_ALREADY_IN_USE" -> "An account with this email already exists."
                 "ERROR_WEAK_PASSWORD" -> "Choose a stronger password with at least 8 characters."
                 "ERROR_NETWORK_REQUEST_FAILED" -> "Network connection failed. Check your connection and retry."

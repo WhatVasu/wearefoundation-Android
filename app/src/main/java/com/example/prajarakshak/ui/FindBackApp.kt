@@ -1,8 +1,11 @@
 package com.example.prajarakshak.ui
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.MutableContextWrapper
+import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -27,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -48,6 +52,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
@@ -69,6 +74,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -76,12 +83,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -89,8 +98,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -102,6 +115,8 @@ import androidx.credentials.exceptions.GetCredentialException
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -110,6 +125,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.prajarakshak.BuildConfig
+import com.example.prajarakshak.R
 import com.example.prajarakshak.data.model.CaseReport
 import com.example.prajarakshak.data.model.ReportRequest
 import com.example.prajarakshak.data.model.SearchRequest
@@ -124,13 +140,14 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import java.io.File
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
-private data class Tab(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+private data class Tab(val route: String, val label: Int, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 private val tabs = listOf(
-    Tab("home", "Home", Icons.Default.Home),
-    Tab("search", "Search", Icons.Default.Search),
-    Tab("reports", "My Reports", Icons.Default.Assignment),
-    Tab("profile", "Profile", Icons.Default.Person)
+    Tab("home", R.string.tab_home, Icons.Default.Home),
+    Tab("search", R.string.tab_search, Icons.Default.Search),
+    Tab("reports", R.string.tab_reports, Icons.Default.Assignment),
+    Tab("profile", R.string.tab_profile, Icons.Default.Person)
 )
 
 @Composable
@@ -141,39 +158,90 @@ fun FindBackApp(viewModel: FindBackViewModel = viewModel()) {
     val backStack by navController.currentBackStackEntryAsState()
     val currentDestination = backStack?.destination
     val context = LocalContext.current
+    var languageMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("We are Foundation Telangana", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(
-                            "Every Person Matters. Every Reunion Counts.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(42.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surface,
+                            shadowElevation = 1.dp
+                        ) {
+                            Image(
+                                painter = painterResource(R.drawable.we_are_foundation_logo),
+                                contentDescription = "We Are Foundation logo",
+                                modifier = Modifier.padding(2.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
+                        Column {
+                            Text(
+                                stringResource(R.string.brand_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                stringResource(R.string.brand_tagline),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                actions = {
+                    IconButton(onClick = { languageMenuExpanded = true }) {
+                        Icon(Icons.Default.Language, contentDescription = stringResource(R.string.language))
+                    }
+                    DropdownMenu(
+                        expanded = languageMenuExpanded,
+                        onDismissRequest = { languageMenuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.language_english)) },
+                            onClick = {
+                                languageMenuExpanded = false
+                                AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en"))
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.language_telugu)) },
+                            onClick = {
+                                languageMenuExpanded = false
+                                AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("te"))
+                            }
                         )
                     }
                 }
             )
         },
         bottomBar = {
-            if (tabs.any { it.route == currentDestination?.route }) {
-                NavigationBar {
-                    tabs.forEach { tab ->
-                        NavigationBarItem(
-                            selected = currentDestination?.hierarchy?.any { it.route == tab.route } == true,
-                            onClick = {
-                                navController.navigate(tab.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = { Icon(tab.icon, contentDescription = tab.label) },
-                            label = { Text(tab.label) }
-                        )
-                    }
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                tabs.forEach { tab ->
+                    NavigationBarItem(
+                        selected = currentDestination?.hierarchy?.any { it.route == tab.route } == true,
+                        onClick = {
+                            navController.navigate(tab.route) {
+                                popUpTo(navController.graph.findStartDestination().id)
+                                launchSingleTop = true
+                            }
+                        },
+                        icon = { Icon(tab.icon, contentDescription = context.getString(tab.label)) },
+                        label = { Text(stringResource(tab.label)) }
+                    )
                 }
             }
         }
@@ -236,8 +304,31 @@ fun FindBackApp(viewModel: FindBackViewModel = viewModel()) {
                     }
                 )
             }
+            composable("myReportDetails/{reportId}") { entry ->
+                val reportId = entry.arguments?.getString("reportId").orEmpty()
+                LaunchedEffect(reportId) { viewModel.loadReportDetails(reportId, ownedReport = true) }
+                ReportDetailsScreen(
+                    report = state.selectedReport?.takeIf { it.reportId == reportId },
+                    loading = state.detailsLoading,
+                    error = state.detailsError,
+                    onRetry = { viewModel.loadReportDetails(reportId, ownedReport = true) },
+                    onBack = {
+                        viewModel.clearSelectedReport()
+                        navController.popBackStack()
+                    },
+                    onPotentialMatch = { linkedReportId ->
+                        navController.navigate("found-match/${Uri.encode(linkedReportId)}")
+                    }
+                )
+            }
             composable("reports") {
-                ReportsScreen(state, viewModel, onLogin = { navController.navigate("profile") }, onRefresh = viewModel::loadReports)
+                ReportsScreen(
+                    state,
+                    viewModel,
+                    onLogin = { navController.navigate("profile") },
+                    onRefresh = viewModel::loadReports,
+                    onOpenDetails = { navController.navigate("myReportDetails/${Uri.encode(it)}") }
+                )
             }
             composable("notifications") {
                 NotificationsScreen(state, viewModel, onBack = { navController.popBackStack() })
@@ -385,11 +476,12 @@ private fun HomeScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (state.user == null) "Welcome" else "Hello, ${state.user.displayName ?: "there"}",
+                        if (state.user == null) stringResource(R.string.home_welcome)
+                        else "Hello, ${state.user.displayName ?: "there"}",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    Text("A safer way to help families reconnect.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.home_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Surface(
                     shape = CircleShape,
@@ -404,7 +496,7 @@ private fun HomeScreen(
         }
         item {
             ActionCard(
-                title = "Report a Person Found",
+                title = stringResource(R.string.home_report_found),
                 subtitle = "Share safe, useful details about someone who may need help.",
                 badge = "HELP SOMEONE",
                 onClick = onFound
@@ -412,7 +504,7 @@ private fun HomeScreen(
         }
         item {
             ActionCard(
-                title = "Find a Missing Person",
+                title = stringResource(R.string.home_find_missing),
                 subtitle = "Search published cases using name, area and physical details.",
                 badge = "SEARCH CASES",
                 onClick = onFind,
@@ -420,7 +512,7 @@ private fun HomeScreen(
             )
         }
         item {
-            SecondaryAction("My Reports", onReports, Modifier.fillMaxWidth())
+            SecondaryAction(stringResource(R.string.home_my_reports), onReports, Modifier.fillMaxWidth())
         }
         if (state.user != null) {
             item {
@@ -438,7 +530,7 @@ private fun HomeScreen(
         }
         item {
             OutlinedButton(onClick = onNotifications, modifier = Modifier.fillMaxWidth()) {
-                Text("Notifications")
+                Text(stringResource(R.string.home_notifications))
             }
         }
         item {
@@ -471,7 +563,8 @@ private fun ActionCard(
 ) {
     Card(
         onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
+        shape = MaterialTheme.shapes.large,
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp, pressedElevation = 1.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (secondary) MaterialTheme.colorScheme.secondaryContainer
             else MaterialTheme.colorScheme.primary
@@ -501,7 +594,7 @@ private fun ActionCard(
 
 @Composable
 private fun SecondaryAction(title: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    OutlinedButton(onClick = onClick, modifier = modifier.height(72.dp), shape = RoundedCornerShape(14.dp)) {
+    OutlinedButton(onClick = onClick, modifier = modifier.height(72.dp), shape = MaterialTheme.shapes.medium) {
         Text(title, style = MaterialTheme.typography.labelLarge)
     }
 }
@@ -558,8 +651,8 @@ private fun SearchBrowseScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Text("Find Missing People", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Browse reports and help identify individuals.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.search_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.search_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             item {
                 Surface(
@@ -604,12 +697,12 @@ private fun SearchBrowseScreen(
             }
             item {
                 OutlinedButton(onClick = onOpenSearch, modifier = Modifier.fillMaxWidth()) {
-                    Text("Search Filters")
+                    Text(stringResource(R.string.search_filters))
                 }
             }
             item {
                 OutlinedButton(onClick = onReportMissing, modifier = Modifier.fillMaxWidth()) {
-                    Text("Register a missing person")
+                    Text(stringResource(R.string.search_register_missing))
                 }
             }
             item {
@@ -633,8 +726,8 @@ private fun SearchBrowseScreen(
             }
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Recently reported", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Newest first", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.search_recent), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.search_newest), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (state.browseError != null && state.browseResults.isEmpty()) {
@@ -653,8 +746,8 @@ private fun SearchBrowseScreen(
                 item {
                     Card {
                         Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("No verified found-person reports are available yet.", fontWeight = FontWeight.SemiBold)
-                            Text("Try another district or check back later.")
+                            Text(stringResource(R.string.search_no_reports), fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.search_try_later))
                             OutlinedButton(onClick = { onDistrictChanged(district) }) { Text("Refresh") }
                             if (state.browseHasMore) {
                                 OutlinedButton(
@@ -710,7 +803,11 @@ private fun FeedSkeleton() {
 
 @Composable
 private fun BrowseReportCard(report: CaseReport, onClick: () -> Unit) {
-    Card(onClick = onClick, shape = RoundedCornerShape(14.dp)) {
+    Card(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.medium,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 1.dp)
+    ) {
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -724,7 +821,7 @@ private fun BrowseReportCard(report: CaseReport, onClick: () -> Unit) {
                 val imageUrl = report.imageUrls.orEmpty().firstOrNull()
                 if (imageUrl.isNullOrBlank()) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Person, contentDescription = "Photo unavailable", modifier = Modifier.size(44.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                        Icon(Icons.Default.Person, contentDescription = stringResource(R.string.search_no_photo), modifier = Modifier.size(44.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
                 } else {
                     AsyncImage(
@@ -750,14 +847,17 @@ private fun BrowseReportCard(report: CaseReport, onClick: () -> Unit) {
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    "Reported in ${report.district ?: "district not listed"}",
+                    stringResource(
+                        R.string.search_reported_in,
+                        report.district ?: stringResource(R.string.search_unknown_district)
+                    ),
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
                     "Reported ${report.createdAt?.take(10) ?: "date unavailable"}",
                     style = MaterialTheme.typography.bodySmall
                 )
-                val featureSummary = report.physicalFeatures.values.filter { it.isNotBlank() }.joinToString(", ")
+                val featureSummary = report.physicalFeatures.orEmpty().values.filter { it.isNotBlank() }.joinToString(", ")
                 if (featureSummary.isNotBlank()) {
                     Text(featureSummary, style = MaterialTheme.typography.bodySmall, maxLines = 2)
                 }
@@ -817,10 +917,18 @@ private fun ReportDetailsScreen(
                             }
                         }
                     }
-                    item { Text("Report details", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
+                    item { Text(stringResource(R.string.report_details_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
                     item { Text("Reference ID: ${report.reportId}", style = MaterialTheme.typography.titleSmall) }
-                    if (report.reportType == "MISSING" && !report.name.isNullOrBlank()) {
-                        item { DetailLine("Missing person's name", report.name) }
+                    report.name?.takeIf(String::isNotBlank)?.let { name ->
+                        item {
+                            DetailLine(
+                                stringResource(
+                                    if (report.reportType == "MISSING") R.string.report_missing_name
+                                    else R.string.report_name
+                                ),
+                                name
+                            )
+                        }
                     }
                     item {
                         DetailLine(
@@ -838,7 +946,7 @@ private fun ReportDetailsScreen(
                         item { DetailLine("Last-seen date", report.lastSeenDate) }
                     }
                     item {
-                        val characteristics = report.physicalFeatures.entries
+                        val characteristics = report.physicalFeatures.orEmpty().entries
                             .filter { it.value.isNotBlank() }
                             .joinToString("\n") { (key, value) -> "${key.replaceFirstChar(Char::uppercase)}: $value" }
                             .ifBlank { "No public physical characteristics were provided." }
@@ -878,7 +986,10 @@ private fun ReportDetailsScreen(
 
 @Composable
 private fun DetailLine(label: String, value: String) {
-    Card(shape = RoundedCornerShape(12.dp)) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Text(value, style = MaterialTheme.typography.bodyMedium)
@@ -1111,7 +1222,8 @@ private fun ReportsScreen(
     state: FindBackUiState,
     viewModel: FindBackViewModel,
     onLogin: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onOpenDetails: (String) -> Unit
 ) {
     var selectedType by rememberSaveable { mutableStateOf("FOUND") }
     var editingReport by remember { mutableStateOf<CaseReport?>(null) }
@@ -1130,11 +1242,11 @@ private fun ReportsScreen(
         if (state.user != null) onRefresh()
     }
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("My Reports", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.reports_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterPill("Found reports", selectedType == "FOUND") { selectedType = "FOUND" }
-            FilterPill("Missing cases", selectedType == "MISSING") { selectedType = "MISSING" }
-            FilterPill("Sightings", selectedType == "SIGHTING") { selectedType = "SIGHTING" }
+            FilterPill(stringResource(R.string.reports_found), selectedType == "FOUND") { selectedType = "FOUND" }
+            FilterPill(stringResource(R.string.reports_missing), selectedType == "MISSING") { selectedType = "MISSING" }
+            FilterPill(stringResource(R.string.reports_sightings), selectedType == "SIGHTING") { selectedType = "SIGHTING" }
         }
         if (state.user == null) {
             Card {
@@ -1160,7 +1272,11 @@ private fun ReportsScreen(
             } else {
                 LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(reports) { report ->
-                        CaseCard(report, showDescription = true) {
+                        CaseCard(
+                            report,
+                            showDescription = true,
+                            onClick = { onOpenDetails(report.reportId) }
+                        ) {
                             editingReport = report
                             editDescription = report.description.orEmpty()
                         }
@@ -1221,7 +1337,7 @@ private fun NotificationsScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = onBack) { Text("‹  Back") }
-                Text("Notifications", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.notifications_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
         }
         if (state.user == null) {
@@ -1265,9 +1381,16 @@ private fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
 private fun CaseCard(
     report: CaseReport,
     showDescription: Boolean = false,
+    onClick: (() -> Unit)? = null,
     onUpdate: (() -> Unit)? = null
 ) {
-    Card(shape = RoundedCornerShape(14.dp)) {
+    Card(
+        modifier = Modifier.then(
+            if (onClick == null) Modifier else Modifier.clickable { onClick() }
+        ),
+        shape = MaterialTheme.shapes.medium,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             if (showDescription && !report.imageUrls.isNullOrEmpty()) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1291,9 +1414,9 @@ private fun CaseCard(
                 listOfNotNull(report.age?.let { "Approx. $it years" }, report.location).joinToString(" · ").ifBlank { "Location details restricted" },
                 style = MaterialTheme.typography.bodyMedium
             )
-            if (report.matchingSignals.isNotEmpty()) {
+            if (!report.matchingSignals.isNullOrEmpty()) {
                 Text(
-                    "Matching details: ${report.matchingSignals.joinToString(", ")}",
+                    "Matching details: ${report.matchingSignals.orEmpty().joinToString(", ")}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -1302,9 +1425,9 @@ private fun CaseCard(
                 HorizontalDivider(Modifier.padding(vertical = 3.dp))
                 Text(report.description, style = MaterialTheme.typography.bodySmall, maxLines = 3)
             }
-            if (showDescription && report.statusHistory.isNotEmpty()) {
+            if (showDescription && !report.statusHistory.isNullOrEmpty()) {
                 Text(
-                    "Status history: " + report.statusHistory.joinToString(" → ") { it.status.replace('_', ' ') },
+                    "Status history: " + report.statusHistory.orEmpty().joinToString(" → ") { it.status.replace('_', ' ') },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1340,6 +1463,7 @@ private fun ProfileScreen(
     var validation by rememberSaveable { mutableStateOf<String?>(null) }
     var authValidationAttempted by rememberSaveable { mutableStateOf(false) }
     var profileValidationAttempted by rememberSaveable { mutableStateOf(false) }
+    var phoneAuthVisible by rememberSaveable { mutableStateOf(false) }
     var wasSignedOut by remember { mutableStateOf(state.user == null) }
     val emailError = if (authValidationAttempted) emailValidationError(email) else null
     val passwordError = if (authValidationAttempted) {
@@ -1371,20 +1495,23 @@ private fun ProfileScreen(
     LaunchedEffect(state.profileUpdateVersion) {
         if (state.profileUpdateVersion > 0) editingProfile = false
     }
+    LaunchedEffect(state.phoneAuthSuccessVersion) {
+        if (state.phoneAuthSuccessVersion > 0) phoneAuthVisible = false
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { Text("Profile", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
+        item { Text(stringResource(R.string.profile_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
         if (state.user != null) {
             item {
                 Card {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(state.user.displayName ?: "We are Foundation member", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(state.user.email ?: "")
-                        Text("Account type: ${state.profile?.role?.replaceFirstChar(Char::uppercase) ?: "Citizen"}")
+                        Text(stringResource(R.string.profile_account_type, state.profile?.role?.replaceFirstChar(Char::uppercase) ?: "Citizen"))
                         Text("Admin privileges are assigned by the service operator.", style = MaterialTheme.typography.bodySmall)
                         if (state.profile == null) {
                             Text("Your account is signed in, but profile data could not be loaded.")
@@ -1396,12 +1523,12 @@ private fun ProfileScreen(
                             val profileNameError = if (profileValidationAttempted && name.isBlank()) "Full name is required." else null
                             val profilePhoneError = if (profileValidationAttempted) phoneValidationError(phone) else null
                             val profileDistrictError = if (profileValidationAttempted && district.isBlank()) "District is required." else null
-                            FormField("Full name", name, { name = it }, isError = profileNameError != null, supportingText = profileNameError)
+                            FormField(stringResource(R.string.auth_full_name), name, { name = it }, isError = profileNameError != null, supportingText = profileNameError)
                             FormField(
-                                "Mobile number", phone, { phone = it }, keyboardType = KeyboardType.Phone,
+                                stringResource(R.string.auth_mobile), phone, { phone = it }, keyboardType = KeyboardType.Phone,
                                 isError = profilePhoneError != null, supportingText = profilePhoneError
                             )
-                            FormField("District", district, { district = it }, isError = profileDistrictError != null, supportingText = profileDistrictError)
+                            FormField(stringResource(R.string.report_district), district, { district = it }, isError = profileDistrictError != null, supportingText = profileDistrictError)
                             Button(
                                 onClick = {
                                     profileValidationAttempted = true
@@ -1414,51 +1541,67 @@ private fun ProfileScreen(
                                     }
                                 },
                                 enabled = !state.loading
-                            ) { Text("Save profile") }
-                            TextButton(onClick = { editingProfile = false }) { Text("Cancel") }
+                            ) { Text(stringResource(R.string.profile_save)) }
+                            TextButton(onClick = { editingProfile = false }) { Text(stringResource(R.string.profile_cancel)) }
                             if (validation != null) Text(validation!!, color = MaterialTheme.colorScheme.error)
                         } else {
-                            Text("Mobile: ${state.profile?.phone.orEmpty()}")
-                            Text("District: ${state.profile?.district.orEmpty()}")
-                            TextButton(onClick = { editingProfile = true }) { Text("Edit profile") }
+                            Text(stringResource(R.string.profile_mobile, state.profile?.phone.orEmpty()))
+                            Text(stringResource(R.string.profile_district, state.profile?.district.orEmpty()))
+                            TextButton(onClick = { editingProfile = true }) { Text(stringResource(R.string.profile_edit)) }
+                        }
+                        if (phoneAuthVisible) {
+                            PhoneAuthPanel(
+                                state = state,
+                                viewModel = viewModel,
+                                activity = context.findActivity(),
+                                initialPhone = state.profile?.phone.orEmpty(),
+                                onCancel = {
+                                    viewModel.cancelPhoneAuthentication()
+                                    phoneAuthVisible = false
+                                }
+                            )
+                        } else {
+                            OutlinedButton(onClick = { phoneAuthVisible = true }) {
+                                Text(stringResource(R.string.auth_link_phone))
+                            }
                         }
                         if (state.profile?.role == "admin") {
-                            OutlinedButton(onClick = onAdmin) { Text("Open admin review") }
+                            OutlinedButton(onClick = onAdmin) { Text(stringResource(R.string.profile_open_admin)) }
                         }
-                        OutlinedButton(onClick = viewModel::signOut) { Text("Sign out") }
+                        OutlinedButton(onClick = viewModel::signOut) { Text(stringResource(R.string.profile_sign_out)) }
                     }
                 }
             }
         } else {
             item {
                 Text(
-                    if (creatingAccount) "Create a citizen account" else "Sign in",
+                    stringResource(if (creatingAccount) R.string.auth_create_account else R.string.auth_sign_in),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold
                 )
             }
             if (creatingAccount) {
-                item { FormField("Full name", name, { name = it }, isError = nameError != null, supportingText = nameError) }
+                item { FormField(stringResource(R.string.auth_full_name), name, { name = it }, isError = nameError != null, supportingText = nameError) }
                 item {
                     FormField(
-                        "Mobile number", phone, { phone = it }, keyboardType = KeyboardType.Phone,
+                        stringResource(R.string.auth_mobile), phone, { phone = it }, keyboardType = KeyboardType.Phone,
                         isError = phoneError != null, supportingText = phoneError
                     )
                 }
                 item {
                     val error = if (authValidationAttempted && district.isBlank()) "District is required." else null
-                    FormField("District", district, { district = it }, isError = error != null, supportingText = error)
+                    FormField(stringResource(R.string.report_district), district, { district = it }, isError = error != null, supportingText = error)
                 }
             }
             item {
                 FormField(
-                    "Email", email, { email = it }, keyboardType = KeyboardType.Email,
+                    stringResource(R.string.auth_email), email, { email = it }, keyboardType = KeyboardType.Email,
                     isError = emailError != null, supportingText = emailError
                 )
             }
             item {
                 FormField(
-                    "Password", password, { password = it },
+                    stringResource(R.string.auth_password), password, { password = it },
                     visualTransformation = if (passwordVisible) {
                         androidx.compose.ui.text.input.VisualTransformation.None
                     } else {
@@ -1478,7 +1621,7 @@ private fun ProfileScreen(
             if (creatingAccount) {
                 item {
                     FormField(
-                        "Confirm password", confirmPassword, { confirmPassword = it },
+                        stringResource(R.string.auth_confirm_password), confirmPassword, { confirmPassword = it },
                         visualTransformation = if (confirmPasswordVisible) {
                             androidx.compose.ui.text.input.VisualTransformation.None
                         } else {
@@ -1526,12 +1669,12 @@ private fun ProfileScreen(
                     },
                     enabled = !state.loading,
                     modifier = Modifier.fillMaxWidth()
-                ) { Text(if (state.loading) "Please wait…" else if (creatingAccount) "Create account" else "Sign in") }
+                ) { Text(if (state.loading) "Please wait…" else stringResource(if (creatingAccount) R.string.auth_create_button else R.string.auth_sign_in_button)) }
             }
             item {
                 Row {
                     TextButton(onClick = { creatingAccount = !creatingAccount; validation = null }) {
-                        Text(if (creatingAccount) "Already have an account? Sign in" else "Create an account")
+                        Text(stringResource(if (creatingAccount) R.string.auth_toggle_to_sign_in else R.string.auth_toggle_to_register))
                     }
                     if (!creatingAccount) {
                         TextButton(onClick = {
@@ -1544,7 +1687,34 @@ private fun ProfileScreen(
                                 validation = null
                                 viewModel.resetPassword(email)
                             }
-                        }) { Text("Forgot password?") }
+                        }) { Text(stringResource(R.string.auth_forgot_password)) }
+                    }
+                }
+            }
+            if (!creatingAccount) {
+                item {
+                    if (phoneAuthVisible) {
+                        PhoneAuthPanel(
+                            state = state,
+                            viewModel = viewModel,
+                            activity = context.findActivity(),
+                            initialPhone = phone,
+                            onCancel = {
+                                viewModel.cancelPhoneAuthentication()
+                                phoneAuthVisible = false
+                            }
+                        )
+                    } else {
+                        OutlinedButton(
+                            onClick = {
+                                phoneAuthVisible = true
+                                validation = null
+                            },
+                            enabled = !state.loading,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.auth_login_with_phone))
+                        }
                     }
                 }
             }
@@ -1619,6 +1789,133 @@ private fun ProfileScreen(
 }
 
 @Composable
+private fun PhoneAuthPanel(
+    state: FindBackUiState,
+    viewModel: FindBackViewModel,
+    activity: Activity?,
+    initialPhone: String,
+    onCancel: () -> Unit
+) {
+    var phone by rememberSaveable { mutableStateOf(initialPhone) }
+    var code by rememberSaveable { mutableStateOf("") }
+    var validationAttempted by rememberSaveable { mutableStateOf(false) }
+    var activityError by remember { mutableStateOf<String?>(null) }
+    var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val phoneError = if (validationAttempted && !state.phoneOtpSent) {
+        phoneValidationError(phone)
+    } else null
+    val resendAt = state.phoneResendAvailableAt
+    LaunchedEffect(resendAt) {
+        while (resendAt != null && currentTime < resendAt) {
+            delay(1_000)
+            currentTime = System.currentTimeMillis()
+        }
+    }
+    val resendSeconds = resendAt?.let {
+        ((it - currentTime + 999) / 1_000).coerceAtLeast(0).toInt()
+    } ?: 0
+
+    Card {
+        Column(
+            Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                stringResource(if (state.user == null) R.string.auth_login_with_phone else R.string.auth_link_phone),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (!state.phoneOtpSent) {
+                FormField(
+                    label = stringResource(R.string.auth_phone_number),
+                    value = phone,
+                    onValueChange = { phone = it },
+                    keyboardType = KeyboardType.Phone,
+                    hint = stringResource(R.string.auth_phone_hint),
+                    isError = phoneError != null,
+                    supportingText = phoneError
+                )
+                Button(
+                    onClick = {
+                        validationAttempted = true
+                        val error = phoneValidationError(phone)
+                        if (error != null) {
+                            activityError = error
+                        } else if (activity == null) {
+                            activityError = "Phone verification is unavailable on this screen."
+                        } else {
+                            activityError = null
+                            viewModel.startPhoneVerification(activity, phone)
+                        }
+                    },
+                    enabled = !state.phoneAuthLoading && !state.loading,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (state.phoneAuthLoading) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(stringResource(R.string.auth_send_otp))
+                    }
+                }
+            } else {
+                Text(stringResource(R.string.auth_phone_code_sent, phone))
+                FormField(
+                    label = stringResource(R.string.auth_verification_code),
+                    value = code,
+                    onValueChange = { value ->
+                        if (value.length <= 6 && value.all(Char::isDigit)) code = value
+                    },
+                    keyboardType = KeyboardType.Number,
+                    hint = "000000"
+                )
+                Button(
+                    onClick = { viewModel.verifyPhoneCode(code) },
+                    enabled = !state.phoneAuthLoading && !state.loading && code.length == 6,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (state.phoneAuthLoading) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(stringResource(R.string.auth_verify_otp))
+                    }
+                }
+                TextButton(
+                    onClick = {
+                        if (activity == null) {
+                            activityError = "Phone verification is unavailable on this screen."
+                        } else {
+                            activityError = null
+                            viewModel.startPhoneVerification(activity, phone, resend = true)
+                        }
+                    },
+                    enabled = !state.phoneAuthLoading && !state.loading && resendSeconds == 0
+                ) {
+                    Text(
+                        if (resendSeconds > 0) {
+                            stringResource(R.string.auth_resend_otp_in, resendSeconds)
+                        } else {
+                            stringResource(R.string.auth_resend_otp)
+                        }
+                    )
+                }
+            }
+            (activityError ?: state.phoneAuthError)?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            TextButton(onClick = onCancel) {
+                Text(stringResource(R.string.auth_cancel_phone))
+            }
+        }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+@Composable
 private fun AdminScreen(
     state: FindBackUiState,
     viewModel: FindBackViewModel,
@@ -1655,7 +1952,7 @@ private fun AdminScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = onBack) { Text("‹  Back to profile") }
-                Text("Admin review", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.admin_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
         }
         if (state.profile?.role != "admin") {
@@ -1676,7 +1973,15 @@ private fun AdminScreen(
                             "VERIFIED", "RESOLVED", "CLOSED"
                         )
                     ) { queue ->
-                        FilterPill(queue.replace('_', ' '), status == queue) { status = queue }
+                        val queueLabel = when (queue) {
+                            "SUBMITTED" -> stringResource(R.string.admin_submitted)
+                            "UNDER_REVIEW" -> stringResource(R.string.admin_under_review)
+                            "POTENTIAL_MATCH" -> stringResource(R.string.admin_potential_match)
+                            "VERIFIED" -> stringResource(R.string.admin_verified)
+                            "RESOLVED" -> stringResource(R.string.admin_resolved)
+                            else -> stringResource(R.string.admin_closed)
+                        }
+                        FilterPill(queueLabel, status == queue) { status = queue }
                     }
                 }
             }
@@ -1724,11 +2029,11 @@ private fun AdminScreen(
                                         editError = null
                                     },
                                     enabled = !state.loading
-                                ) { Text("Edit") }
+                                ) { Text(stringResource(R.string.admin_edit)) }
                                 TextButton(
                                     onClick = { deleteCandidate = report },
                                     enabled = !state.loading
-                                ) { Text("Delete") }
+                                ) { Text(stringResource(R.string.admin_delete)) }
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (report.status == "SUBMITTED") {
@@ -1742,7 +2047,7 @@ private fun AdminScreen(
                                     OutlinedButton(onClick = {
                                         viewModel.updateReportStatus(report.reportId, "VERIFIED", status)
                                     }, enabled = !state.loading) {
-                                        Text("Verify")
+                                        Text(stringResource(R.string.admin_verify))
                                     }
                                 }
                                 if (report.status !in setOf("CLOSED", "RESOLVED")) {
@@ -1750,7 +2055,7 @@ private fun AdminScreen(
                                         onClick = { closeCandidate = report },
                                         enabled = !state.loading
                                     ) {
-                                        Text("Close")
+                                        Text(stringResource(R.string.admin_close))
                                     }
                                 }
                             }
@@ -1974,34 +2279,77 @@ private fun ReportFormScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Text(
-                when {
-                    potentialCaseId != null -> "Submit a Potential Sighting"
-                    missing -> "Register a Missing Person"
-                    else -> "Report a Person Found"
-                },
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                if (potentialCaseId != null) {
-                    "Share when and where you observed this person. This private sighting will be linked to report $potentialCaseId for administrator review."
-                } else {
-                    "Fields marked optional can be left blank when unknown."
+            if (potentialCaseId != null) {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary
+                            ) {
+                                Icon(
+                                    Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.padding(12.dp).size(24.dp)
+                                )
+                            }
+                            Text(
+                                stringResource(R.string.report_sighting_title),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                        Text(
+                            stringResource(R.string.report_sighting_intro),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.18f))
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                stringResource(R.string.report_sighting_linked_case),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
+                            )
+                            Text(
+                                potentialCaseId,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                        Text(
+                            stringResource(R.string.report_sighting_privacy),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
                 }
-            )
+            } else {
+                Text(
+                    if (missing) "Register a Missing Person" else "Report a Person Found",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text("Fields marked optional can be left blank when unknown.")
+            }
         }
         if (state.user == null) {
             item {
                 TextButton(onClick = onSignIn) { Text("Sign in to submit this report") }
             }
         }
-        item {
-            SectionTitle(
-                if (potentialCaseId != null) "Observation photograph (optional)"
-                else "Photograph (optional)"
-            )
-        }
+        item { SectionTitle(stringResource(R.string.report_photo_observation)) }
         item {
             Card(shape = RoundedCornerShape(14.dp)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -2033,26 +2381,26 @@ private fun ReportFormScreen(
                             },
                             enabled = photoUris.size < 4,
                             modifier = Modifier.weight(1f)
-                        ) { Text("Take photo") }
+                        ) { Text(stringResource(R.string.report_take_photo)) }
                         OutlinedButton(
                             onClick = { galleryPicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) },
                             enabled = photoUris.size < 4,
                             modifier = Modifier.weight(1f)
-                        ) { Text("Choose photo") }
+                        ) { Text(stringResource(R.string.report_choose_photo)) }
                     }
-                    if (photoUris.isNotEmpty()) TextButton(onClick = { photoUris.clear() }) { Text("Remove all photos") }
+                    if (photoUris.isNotEmpty()) TextButton(onClick = { photoUris.clear() }) { Text(stringResource(R.string.report_remove_photos)) }
                 }
             }
         }
         item {
             SectionTitle(
-                if (potentialCaseId != null) "Observed person (optional details)"
-                else "Person details"
+                if (potentialCaseId != null) stringResource(R.string.report_observed_person)
+                else stringResource(R.string.report_person_details)
             )
         }
         item {
             FormField(
-                if (missing) "Missing person's name" else "Person's name (if known)",
+                stringResource(if (missing) R.string.report_missing_name else R.string.report_name),
                 name,
                 { name = it; persistDraft() },
                 isError = nameError != null, supportingText = nameError
@@ -2061,36 +2409,36 @@ private fun ReportFormScreen(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FormField(
-                    "Approx. age", age, { age = it; persistDraft() },
+                    stringResource(R.string.report_age), age, { age = it; persistDraft() },
                     Modifier.weight(1f), KeyboardType.Number,
                     isError = ageError != null, supportingText = ageError
                 )
                 GenderDropdown(gender, Modifier.weight(1f)) { gender = it; persistDraft() }
             }
         }
-        item { FormField("Approximate height", height, { height = it; persistDraft() }) }
-        item { FormField("Hair colour", hair, { hair = it; persistDraft() }) }
-        item { FormField("Clothing", clothing, { clothing = it; persistDraft() }) }
-        item { FormField("Distinctive marks (mole, scar, birthmark)", marks, { marks = it; persistDraft() }, minLines = 2) }
+        item { FormField(stringResource(R.string.report_height), height, { height = it; persistDraft() }) }
+        item { FormField(stringResource(R.string.report_hair), hair, { hair = it; persistDraft() }) }
+        item { FormField(stringResource(R.string.report_clothing), clothing, { clothing = it; persistDraft() }) }
+        item { FormField(stringResource(R.string.report_marks), marks, { marks = it; persistDraft() }, minLines = 2) }
         item {
             SectionTitle(
                 when {
-                    potentialCaseId != null -> "Sighting details"
-                    missing -> "Last-seen details"
-                    else -> "Encounter details"
+                    potentialCaseId != null -> stringResource(R.string.report_sighting_details)
+                    missing -> stringResource(R.string.report_last_seen_details)
+                    else -> stringResource(R.string.report_encounter_details)
                 }
             )
         }
         item {
             FormField(
-                "District", district, { district = it; persistDraft() },
+                stringResource(R.string.report_district), district, { district = it; persistDraft() },
                 isError = districtError != null, supportingText = districtError
             )
         }
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 FormField(
-                    "Area / locality", location, { location = it; persistDraft() },
+                    stringResource(R.string.report_locality), location, { location = it; persistDraft() },
                     Modifier.weight(1f), isError = locationError != null, supportingText = locationError
                 )
                 Spacer(Modifier.width(8.dp))
@@ -2108,13 +2456,13 @@ private fun ReportFormScreen(
                 ) { Text("GPS") }
             }
         }
-        item { FormField("Nearby landmark", landmark, { landmark = it; persistDraft() }) }
+        item { FormField(stringResource(R.string.report_landmark), landmark, { landmark = it; persistDraft() }) }
         item {
             FormField(
                 when {
-                    potentialCaseId != null -> "Date observed"
-                    missing -> "Last-seen date"
-                    else -> "Date encountered"
+                    potentialCaseId != null -> stringResource(R.string.report_date_observed)
+                    missing -> stringResource(R.string.report_date_last_seen)
+                    else -> stringResource(R.string.report_date_encountered)
                 },
                 date,
                 { date = it; persistDraft() },
@@ -2125,30 +2473,30 @@ private fun ReportFormScreen(
         }
         item {
             FormField(
-                if (potentialCaseId != null) "What did you observe? (optional)"
-                else "Additional description / observations",
+                if (potentialCaseId != null) stringResource(R.string.report_sighting_details)
+                else stringResource(R.string.report_additional_details),
                 details,
                 { details = it; persistDraft() },
                 minLines = 3
             )
         }
         if (missing) {
-            item { SectionTitle("Family contact and police report") }
+            item { SectionTitle(stringResource(R.string.report_family_contact)) }
             item {
                 FormField(
-                    "Family contact name", contactName, { contactName = it; persistDraft() },
+                    stringResource(R.string.report_family_contact), contactName, { contactName = it; persistDraft() },
                     isError = contactNameError != null, supportingText = contactNameError
                 )
             }
             item {
                 FormField(
-                    "Verified contact number", contactPhone, { contactPhone = it; persistDraft() },
+                    stringResource(R.string.report_contact_number), contactPhone, { contactPhone = it; persistDraft() },
                     keyboardType = KeyboardType.Phone,
                     isError = contactPhoneError != null, supportingText = contactPhoneError
                 )
             }
-            item { FormField("Police station (optional)", policeStation, { policeStation = it; persistDraft() }) }
-            item { FormField("Complaint / FIR reference (optional)", fir, { fir = it; persistDraft() }) }
+            item { FormField(stringResource(R.string.report_police_station), policeStation, { policeStation = it; persistDraft() }) }
+            item { FormField(stringResource(R.string.report_fir), fir, { fir = it; persistDraft() }) }
             item {
                 Text(
                     "An FIR number is not required for an initial case. Please also report a missing person to the appropriate police station.",
@@ -2179,7 +2527,7 @@ private fun ReportFormScreen(
                 onClick = onBack,
                 enabled = !state.loading,
                 modifier = Modifier.weight(1f).height(52.dp)
-            ) { Text("Back") }
+            ) { Text(stringResource(R.string.button_back)) }
             Button(
                 onClick = {
                     reportValidationAttempted = true
@@ -2246,7 +2594,7 @@ private fun ReportFormScreen(
                             else -> "FOUND"
                         })
                         "Submitted"
-                    else if (potentialCaseId != null) "Submit Sighting" else "Submit Report"
+                    else if (potentialCaseId != null) "Submit Sighting" else stringResource(R.string.report_submit)
                 )
             }
     }
@@ -2280,7 +2628,7 @@ private fun GenderDropdown(
             trailingIcon = {
                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
             },
-            shape = RoundedCornerShape(12.dp),
+            shape = MaterialTheme.shapes.medium,
             singleLine = true
         )
         ExposedDropdownMenu(
@@ -2326,7 +2674,7 @@ private fun FormField(
         supportingText = supportingText?.let { { Text(it) } },
         minLines = minLines,
         visualTransformation = visualTransformation,
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         singleLine = minLines == 1
     )
 }

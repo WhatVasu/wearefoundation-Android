@@ -12,7 +12,20 @@
           "package_name": "com.example.prajarakshak"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "721588821219-96gmrsf0beffegqd6mklujds1op3qqj2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.prajarakshak",
+            "certificate_hash": "b81bb6c26d15bfb1ff00e083a27bb72126d99ba5"
+          }
+        },
+        {
+          "client_id": "721588821219-7i03m4sdroaagrugc0q0s7menu5bgi0p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyASIzl-BE6E1G2k8h8gBTddbLS8sSreZbI"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "721588821219-7i03m4sdroaagrugc0q0s7menu5bgi0p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

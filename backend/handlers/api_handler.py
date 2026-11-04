@@ -151,14 +151,12 @@ def _public_report(item, event):
     report = {
         key: item[key]
         for key in (
-            "reportId", "reportType", "age", "gender", "district",
+            "reportId", "reportType", "name", "age", "gender", "district",
             "status", "createdAt", "lastSeenDate", "physicalFeatures",
             "matchingSignals",
         )
         if key in item
     }
-    if item.get("reportType") == "MISSING" and item.get("name"):
-        report["name"] = item["name"]
     if item.get("imageKeys"):
         report["imageUrls"] = [
             f"{_public_api_origin(event)}/public/reports/{item['reportId']}/photos/{index}"

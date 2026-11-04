@@ -36,6 +36,9 @@ interface FindBackApi {
     @GET("reports/my")
     suspend fun getMyReports(): List<CaseReport>
 
+    @GET("reports/{id}")
+    suspend fun getReportDetails(@Path("id") reportId: String): CaseReport
+
     @POST("search")
     suspend fun search(@Body request: SearchRequest): SearchResponse
 
