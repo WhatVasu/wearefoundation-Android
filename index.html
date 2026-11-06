@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WE.ARE.FOUNDATION - Android App</title>
+    <style>
+        :root {
+            --primary-color: #1f2328;
+            --accent-color: #0969da;
+            --bg-color: #f6f8fa;
+            --card-bg: #ffffff;
+            --text-main: #24292f;
+            --text-muted: #57606a;
+            --border-color: #d0d7de;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(31, 35, 40, 0.08);
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .header {
+            background-color: var(--primary-color);
+            color: #ffffff;
+            padding: 30px 20px;
+        }
+
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 24px;
+        }
+
+        .header p {
+            margin: 0;
+            color: #8b949e;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px 20px;
+        }
+
+        .description {
+            font-size: 15px;
+            line-height: 1.5;
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            text-align: left;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: var(--accent-color);
+            color: white;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+            box-shadow: 0 2px 4px rgba(9, 105, 218, 0.2);
+        }
+
+        .btn:hover {
+            background-color: #0860ca;
+        }
+
+        .footer {
+            padding: 15px;
+            background-color: #f1f3f5;
+            border-top: 1px solid var(--border-color);
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .footer a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>WE.ARE.FOUNDATION</h1>
+            <p>FindBack Telangana Android Prototype</p>
+        </div>
+        
+        <div class="content">
+            <div class="description">
+                <p>Welcome to the official download page for the <strong>FindBack Telangana</strong> Android application. This native Kotlin and Jetpack Compose MVP allows users to report found persons, register missing-person cases, and search potential matches securely.</p>
+                <p>Click the button below to head over to the GitHub Releases page and download the latest stable APK build.</p>
+            </div>
+            
+            <!-- Replace the href link below with your actual GitHub repository releases URL -->
+            <a href="https://github.com/WhatVasu/wearefoundation-Android/releases/tag/First" class="btn" target="_blank" rel="noopener noreferrer">Download Latest APK</a>
+        </div>
+        
+        <div class="footer">
+            View source code on <a href="https://github.com/WhatVasu/wearefoundation-Android" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+    </div>
+
+</body>
+</html>
